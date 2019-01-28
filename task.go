@@ -60,7 +60,7 @@ func (t *Task) Publish(taskKey, body string) error {
 	return nil
 }
 
-func (t *Task) On(taskKey string, handleFunc func(action string, deliveries <-chan amqp.Delivery)) {
+func (t *Task) On(taskKey string, handleFunc func(action string, body []byte)) {
 	uri := fmt.Sprintf("task-%s", taskKey)
 	ch, err := t.conn.Channel()
 	failOnError(err, "Failed to open a channel")
@@ -90,7 +90,11 @@ func (t *Task) On(taskKey string, handleFunc func(action string, deliveries <-ch
 		false,  // no-wait
 		nil,    // args
 	)
-	failOnError(err, "Failed to register a consumer")
 	log.Printf("task listen: channel [action='%s'])", uri)
-	handleFunc(uri, msgs)
+	for d := range msgs {
+		handleFunc(uri, d.Body)
+		d.Ack(false)
+	}
+	failOnError(err, "Failed to register a consumer")
+
 }
