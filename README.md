@@ -25,8 +25,9 @@ func handleHello(action string, body []byte) {
 }
 
 func main() {
-
-	tasks, err := goamqptasks.NewTask("localhost:5672")
+	uri := "localhost:5672"
+	group := "tasks"
+	tasks, err := goamqptasks.NewTask(uri,group)
 	if err != nil {
 		panic(err)
 	}
