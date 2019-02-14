@@ -17,14 +17,16 @@ func failOnError(err error, msg string) error {
 }
 
 type Task struct {
-	conn *amqp.Connection
+	conn  *amqp.Connection
+	Group string
 }
 
-func NewTask(uri string) (*Task, error) {
+func NewTask(uri string, Group string) (*Task, error) {
 	conn, err := amqp.Dial(fmt.Sprintf("amqp://%s", uri))
 	failOnError(err, "Failed to connect to RabbitMQ")
 	return &Task{
 		conn,
+		Group,
 	}, err
 }
 
@@ -34,7 +36,7 @@ func (t *Task) Publish(taskKey, body string) error {
 	defer ch.Close()
 
 	q, err := ch.QueueDeclare(
-		fmt.Sprintf("task-%s", taskKey), // name
+		fmt.Sprintf("%s-%s", t.Group, taskKey), // name
 		true,  // durable
 		false, // delete when unused
 		false, // exclusive
@@ -61,7 +63,7 @@ func (t *Task) Publish(taskKey, body string) error {
 }
 
 func (t *Task) On(taskKey string, handleFunc func(action string, body []byte)) {
-	uri := fmt.Sprintf("task-%s", taskKey)
+	uri := fmt.Sprintf("%s-%s", t.Group, taskKey)
 	ch, err := t.conn.Channel()
 	failOnError(err, "Failed to open a channel")
 	q, err := ch.QueueDeclare(
@@ -90,7 +92,6 @@ func (t *Task) On(taskKey string, handleFunc func(action string, body []byte)) {
 		false,  // no-wait
 		nil,    // args
 	)
-	log.Printf("task listen: channel [action='%s'])", uri)
 	for d := range msgs {
 		handleFunc(uri, d.Body)
 		d.Ack(false)
